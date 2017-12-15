@@ -62,7 +62,7 @@ class ViewController: UIViewController, RxMediaPickerDelegate {
         }
     }
     
-    func pickPhoto() {
+    @objc func pickPhoto() {
         picker.selectImage(editable: true)
             .observeOn(MainScheduler.instance)
             .subscribe(onNext: { (image, editedImage) in
@@ -81,7 +81,7 @@ class ViewController: UIViewController, RxMediaPickerDelegate {
             .disposed(by: disposeBag)
     }
         
-    func recordVideo() {
+    @objc func recordVideo() {
         #if (arch(i386) || arch(x86_64))
             let alert = UIAlertController(title: "Error - Simulator", message: "Video recording not available on the simulator", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default, handler: .none))
