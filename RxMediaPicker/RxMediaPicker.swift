@@ -5,7 +5,7 @@ import UIKit
 import AVFoundation
 
 enum RxMediaPickerAction {
-    case photo(observer: AnyObserver<(UIImage, UIImage?)>)
+    case photo(observer: AnyObserver<([String: AnyObject], UIImage, UIImage?)>)
     case video(observer: AnyObserver<URL>, maxDuration: TimeInterval)
 }
 
@@ -119,7 +119,7 @@ public enum RxMediaPickerError: Error {
     }
     
     func processPhoto(info: [String : AnyObject],
-                      observer: AnyObserver<(UIImage, UIImage?)>) {
+                      observer: AnyObserver<([String: AnyObject], UIImage, UIImage?)>) {
         guard let image = info[UIImagePickerControllerOriginalImage] as? UIImage else {
             observer.on(.error(RxMediaPickerError.generalError))
             return
