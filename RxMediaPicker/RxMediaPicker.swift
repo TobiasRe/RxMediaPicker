@@ -79,7 +79,7 @@ public enum RxMediaPickerError: Error {
     
     open func takePhoto(device: UIImagePickerControllerCameraDevice = .rear,
                         flashMode: UIImagePickerControllerCameraFlashMode = .auto,
-                        editable: Bool = false) -> Observable<(UIImage, UIImage?)> {
+                        editable: Bool = false) -> Observable<([String: AnyObject], UIImage, UIImage?)> {
         return Observable.create { [unowned self] observer in
             self.currentAction = RxMediaPickerAction.photo(observer: observer)
             
@@ -103,7 +103,7 @@ public enum RxMediaPickerError: Error {
     }
     
     open func selectImage(source: UIImagePickerControllerSourceType = .photoLibrary,
-                          editable: Bool = false) -> Observable<(UIImage, UIImage?)> {
+                          editable: Bool = false) -> Observable<([String: AnyObject], UIImage, UIImage?)> {
         return Observable.create { [unowned self] observer in
             self.currentAction = RxMediaPickerAction.photo(observer: observer)
             
@@ -127,7 +127,7 @@ public enum RxMediaPickerError: Error {
 
         let editedImage = info[UIImagePickerControllerEditedImage] as? UIImage
 
-        observer.on(.next((image, editedImage)))
+        observer.on(.next((info, image, editedImage)))
         observer.on(.completed)
     }
     
