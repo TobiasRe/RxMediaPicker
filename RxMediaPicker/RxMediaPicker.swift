@@ -4,9 +4,12 @@ import RxSwift
 import UIKit
 import AVFoundation
 
+public typealias FileInfo = [String: Any]
+
 enum RxMediaPickerAction {
-    case photo(observer: AnyObserver<([String: AnyObject], UIImage, UIImage?)>)
+    case photo(observer: AnyObserver<(FileInfo, UIImage, UIImage?)>)
     case video(observer: AnyObserver<URL>, maxDuration: TimeInterval)
+    case document(observer: AnyObserver<[URL]>)
 }
 
 public enum RxMediaPickerError: Error {
@@ -16,11 +19,11 @@ public enum RxMediaPickerError: Error {
 }
 
 @objc public protocol RxMediaPickerDelegate {
-    func present(picker: UIImagePickerController)
-    func dismiss(picker: UIImagePickerController)
+    func present(picker: UIViewController)
+    func dismiss(picker: UIViewController)
 }
 
-@objc open class RxMediaPicker: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+@objc open class RxMediaPicker: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIDocumentPickerDelegate {
     
     weak var delegate: RxMediaPickerDelegate?
     
@@ -79,7 +82,7 @@ public enum RxMediaPickerError: Error {
     
     open func takePhoto(device: UIImagePickerControllerCameraDevice = .rear,
                         flashMode: UIImagePickerControllerCameraFlashMode = .auto,
-                        editable: Bool = false) -> Observable<([String: AnyObject], UIImage, UIImage?)> {
+                        editable: Bool = false) -> Observable<(FileInfo, UIImage, UIImage?)> {
         return Observable.create { [unowned self] observer in
             self.currentAction = RxMediaPickerAction.photo(observer: observer)
             
@@ -103,7 +106,7 @@ public enum RxMediaPickerError: Error {
     }
     
     open func selectImage(source: UIImagePickerControllerSourceType = .photoLibrary,
-                          editable: Bool = false) -> Observable<([String: AnyObject], UIImage, UIImage?)> {
+                          editable: Bool = false) -> Observable<(FileInfo, UIImage, UIImage?)> {
         return Observable.create { [unowned self] observer in
             self.currentAction = RxMediaPickerAction.photo(observer: observer)
             
@@ -118,8 +121,26 @@ public enum RxMediaPickerError: Error {
         }
     }
     
-    func processPhoto(info: [String : AnyObject],
-                      observer: AnyObserver<([String: AnyObject], UIImage, UIImage?)>) {
+    open func selectDocuments(documentTypes: [String], in mode: UIDocumentPickerMode) -> Observable<([URL])> {
+        return Observable.create { [unowned self] observer in
+            self.currentAction = RxMediaPickerAction.document(observer: observer)
+            
+            let picker = UIDocumentPickerViewController(documentTypes: documentTypes, in: mode)
+            
+            self.presentPicker(picker)
+            
+            return Disposables.create()
+        }
+    }
+    
+    func processDocuments(documents: [URL],
+                      observer: AnyObserver<[URL]>) {
+        observer.on(.next(documents))
+        observer.on(.completed)
+    }
+    
+    func processPhoto(info: FileInfo,
+                      observer: AnyObserver<(FileInfo, UIImage, UIImage?)>) {
         guard let image = info[UIImagePickerControllerOriginalImage] as? UIImage else {
             observer.on(.error(RxMediaPickerError.generalError))
             return
@@ -131,7 +152,7 @@ public enum RxMediaPickerError: Error {
         observer.on(.completed)
     }
     
-    func processVideo(info: [String : Any],
+    func processVideo(info: FileInfo,
                       observer: AnyObserver<URL>,
                       maxDuration: TimeInterval,
                       picker: UIImagePickerController) {
@@ -189,27 +210,30 @@ public enum RxMediaPickerError: Error {
         dismissPicker(picker)
     }
 
-    fileprivate func presentPicker(_ picker: UIImagePickerController) {
+    fileprivate func presentPicker(_ picker: UIViewController) {
         DispatchQueue.main.async { [weak self] in
             self?.delegate?.present(picker: picker)
         }
     }
     
-    fileprivate func dismissPicker(_ picker: UIImagePickerController) {
+    fileprivate func dismissPicker(_ picker: UIViewController) {
         DispatchQueue.main.async { [weak self] in
             self?.delegate?.dismiss(picker: picker)
         }
     }
     
     // MARK: UIImagePickerControllerDelegate
-    open func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
+    open func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: FileInfo) {
         if let action = currentAction {
             switch action {
             case .photo(let observer):
-                processPhoto(info: info as [String : AnyObject], observer: observer)
+                processPhoto(info: info, observer: observer)
                 dismissPicker(picker)
             case .video(let observer, let maxDuration):
                 processVideo(info: info, observer: observer, maxDuration: maxDuration, picker: picker)
+            case .document(_):
+                //No Document selected
+                dismissPicker(picker)
             }
         }
     }
@@ -221,6 +245,40 @@ public enum RxMediaPickerError: Error {
             switch action {
             case .photo(let observer):      observer.on(.error(RxMediaPickerError.canceled))
             case .video(let observer, _):   observer.on(.error(RxMediaPickerError.canceled))
+            case .document(let observer):   observer.on(.error(RxMediaPickerError.canceled))
+            }
+        }
+    }
+    
+    // MARK: UIDocumentPickerControllerDelegate
+    open func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentAt url: URL) {
+        documentPicker(controller, didPickDocumentsAt: [url])
+    }
+    
+    open func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        if let action = currentAction {
+            switch action {
+            case .photo(_):
+                //No Photo selected
+                break
+            case .video(_):
+                //No Video selected
+                break
+            case .document(let observer):
+                processDocuments(documents: urls, observer: observer)
+            }
+            dismissPicker(controller)
+        }
+    }
+    
+    open func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        dismissPicker(controller)
+        
+        if let action = currentAction {
+            switch action {
+            case .photo(let observer):      observer.on(.error(RxMediaPickerError.canceled))
+            case .video(let observer, _):   observer.on(.error(RxMediaPickerError.canceled))
+            case .document(let observer):   observer.on(.error(RxMediaPickerError.canceled))
             }
         }
     }
