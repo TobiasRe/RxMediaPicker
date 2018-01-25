@@ -121,11 +121,18 @@ public enum RxMediaPickerError: Error {
         }
     }
     
-    open func selectDocuments(documentTypes: [String], in mode: UIDocumentPickerMode) -> Observable<([URL])> {
+    open func selectDocuments(documentTypes: [String], in mode: UIDocumentPickerMode, multipleSelection: Bool) -> Observable<([URL])> {
         return Observable.create { [unowned self] observer in
             self.currentAction = RxMediaPickerAction.document(observer: observer)
             
             let picker = UIDocumentPickerViewController(documentTypes: documentTypes, in: mode)
+            picker.delegate = self
+            if #available(iOS 11.0, *) {
+                picker.allowsMultipleSelection = multipleSelection
+            } else {
+                // Fallback on earlier versions
+                // Do Nothing
+            }
             
             self.presentPicker(picker)
             
